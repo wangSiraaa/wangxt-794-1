@@ -9,7 +9,8 @@ import type {
   PrintQueueItem,
   RecentQuery,
   MoveRecord,
-  SearchFilters
+  SearchFilters,
+  DashboardGroup
 } from '@/types'
 import { storage } from '@/services/storage'
 import { rules } from '@/services/rules'
@@ -25,6 +26,8 @@ interface AppState {
   boxMatrices: Record<string, BoxMatrix>
   printQueue: PrintQueueItem[]
   recentQueries: RecentQuery[]
+  dashboardGroups: DashboardGroup[]
+  activeDashboardGroupId: string | null
   currentRole: UserRole
   selectedBoxId: string | null
   selectedSample: Sample | null
@@ -59,6 +62,11 @@ type AppAction =
   | { type: 'ADD_MOVE_RECORD'; payload: MoveRecord }
   | { type: 'REFRESH_DATA' }
   | { type: 'MOVE_SAMPLE'; payload: { sampleId: string; toBoxId: string; toPosition: { row: number; col: number }; operator?: string } }
+  | { type: 'SET_DASHBOARD_GROUPS'; payload: DashboardGroup[] }
+  | { type: 'ADD_DASHBOARD_GROUP'; payload: DashboardGroup }
+  | { type: 'UPDATE_DASHBOARD_GROUP'; payload: DashboardGroup }
+  | { type: 'DELETE_DASHBOARD_GROUP'; payload: string }
+  | { type: 'SET_ACTIVE_DASHBOARD_GROUP'; payload: string | null }
 
 const initialState: AppState = {
   freezers: [],
@@ -69,6 +77,8 @@ const initialState: AppState = {
   boxMatrices: {},
   printQueue: [],
   recentQueries: [],
+  dashboardGroups: [],
+  activeDashboardGroupId: null,
   currentRole: UserRole.RESEARCHER,
   selectedBoxId: null,
   selectedSample: null,
@@ -274,9 +284,41 @@ function appReducer(state: AppState, action: AppAction): AppState {
         moveRecords: data.moveRecords,
         boxMatrices: data.boxMatrices,
         printQueue: data.printQueue,
-        recentQueries: data.recentQueries
+        recentQueries: data.recentQueries,
+        dashboardGroups: data.dashboardGroups || [],
+        activeDashboardGroupId: data.activeDashboardGroupId || null
       }
     }
+
+    case 'SET_DASHBOARD_GROUPS':
+      return { ...state, dashboardGroups: action.payload }
+
+    case 'ADD_DASHBOARD_GROUP':
+      return {
+        ...state,
+        dashboardGroups: [...state.dashboardGroups, action.payload]
+      }
+
+    case 'UPDATE_DASHBOARD_GROUP':
+      return {
+        ...state,
+        dashboardGroups: state.dashboardGroups.map(g =>
+          g.id === action.payload.id ? action.payload : g
+        )
+      }
+
+    case 'DELETE_DASHBOARD_GROUP':
+      return {
+        ...state,
+        dashboardGroups: state.dashboardGroups.filter(g => g.id !== action.payload),
+        activeDashboardGroupId:
+          state.activeDashboardGroupId === action.payload
+            ? null
+            : state.activeDashboardGroupId
+      }
+
+    case 'SET_ACTIVE_DASHBOARD_GROUP':
+      return { ...state, activeDashboardGroupId: action.payload }
 
     default:
       return state
@@ -290,6 +332,10 @@ interface AppContextType {
   saveStorage: () => void
   searchSamples: (filters: SearchFilters) => Sample[]
   locateSample: (sampleId: string) => void
+  addDashboardGroup: (name: string, color: string, boxIds: string[]) => void
+  updateDashboardGroup: (groupId: string, name: string, color: string, boxIds: string[]) => void
+  deleteDashboardGroup: (groupId: string) => void
+  setActiveDashboardGroup: (groupId: string | null) => void
 }
 
 const AppContext = createContext<AppContextType | null>(null)
@@ -345,6 +391,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const addDashboardGroup = (name: string, color: string, boxIds: string[]) => {
+    const now = new Date().toISOString()
+    const group: DashboardGroup = {
+      id: generateId('DG'),
+      name,
+      color,
+      boxIds,
+      createdAt: now,
+      updatedAt: now
+    }
+    dispatch({ type: 'ADD_DASHBOARD_GROUP', payload: group })
+    storage.addDashboardGroup(group)
+  }
+
+  const updateDashboardGroup = (groupId: string, name: string, color: string, boxIds: string[]) => {
+    const existing = state.dashboardGroups.find(g => g.id === groupId)
+    if (existing) {
+      const updated: DashboardGroup = {
+        ...existing,
+        name,
+        color,
+        boxIds,
+        updatedAt: new Date().toISOString()
+      }
+      dispatch({ type: 'UPDATE_DASHBOARD_GROUP', payload: updated })
+      storage.updateDashboardGroup(updated)
+    }
+  }
+
+  const deleteDashboardGroup = (groupId: string) => {
+    dispatch({ type: 'DELETE_DASHBOARD_GROUP', payload: groupId })
+    storage.deleteDashboardGroup(groupId)
+  }
+
+  const setActiveDashboardGroup = (groupId: string | null) => {
+    dispatch({ type: 'SET_ACTIVE_DASHBOARD_GROUP', payload: groupId })
+    storage.saveActiveDashboardGroupId(groupId)
+  }
+
   useEffect(() => {
     loadStorage()
   }, [])
@@ -364,9 +449,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     state.recentQueries
   ])
 
+  useEffect(() => {
+    const data = storage.load()
+    data.dashboardGroups = state.dashboardGroups
+    data.activeDashboardGroupId = state.activeDashboardGroupId
+    storage.save(data)
+  }, [state.dashboardGroups, state.activeDashboardGroupId])
+
   return (
     <AppContext.Provider
-      value={{ state, dispatch, loadStorage, saveStorage, searchSamples, locateSample }}
+      value={{
+        state,
+        dispatch,
+        loadStorage,
+        saveStorage,
+        searchSamples,
+        locateSample,
+        addDashboardGroup,
+        updateDashboardGroup,
+        deleteDashboardGroup,
+        setActiveDashboardGroup
+      }}
     >
       {children}
     </AppContext.Provider>

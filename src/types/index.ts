@@ -113,6 +113,15 @@ export interface RecentQuery {
   resultCount: number
 }
 
+export interface DashboardGroup {
+  id: string
+  name: string
+  color: string
+  boxIds: string[]
+  createdAt: string
+  updatedAt: string
+}
+
 export interface LocalStorageData {
   freezers: Freezer[]
   shelves: Shelf[]
@@ -123,6 +132,8 @@ export interface LocalStorageData {
   sampleCodeIndex: Record<string, string>
   printQueue: PrintQueueItem[]
   recentQueries: RecentQuery[]
+  dashboardGroups: DashboardGroup[]
+  activeDashboardGroupId: string | null
   lastPosition?: BoxPosition & Position
 }
 

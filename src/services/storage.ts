@@ -8,7 +8,8 @@ import type {
   PrintQueueItem,
   RecentQuery,
   MoveRecord,
-  SearchFilters
+  SearchFilters,
+  DashboardGroup
 } from '@/types'
 
 const STORAGE_KEY = 'biosample_box_query_data'
@@ -22,7 +23,9 @@ const getDefaultData = (): LocalStorageData => ({
   boxMatrices: {},
   sampleCodeIndex: {},
   printQueue: [],
-  recentQueries: []
+  recentQueries: [],
+  dashboardGroups: [],
+  activeDashboardGroupId: null
 })
 
 export const storage = {
@@ -140,6 +143,49 @@ export const storage = {
   saveRecentQuery(query: RecentQuery): void {
     const data = this.load()
     data.recentQueries = [query, ...data.recentQueries].slice(0, 20)
+    this.save(data)
+  },
+
+  getDashboardGroups(): DashboardGroup[] {
+    return this.load().dashboardGroups
+  },
+
+  saveDashboardGroups(groups: DashboardGroup[]): void {
+    const data = this.load()
+    data.dashboardGroups = groups
+    this.save(data)
+  },
+
+  getActiveDashboardGroupId(): string | null {
+    return this.load().activeDashboardGroupId
+  },
+
+  saveActiveDashboardGroupId(groupId: string | null): void {
+    const data = this.load()
+    data.activeDashboardGroupId = groupId
+    this.save(data)
+  },
+
+  addDashboardGroup(group: DashboardGroup): void {
+    const data = this.load()
+    data.dashboardGroups = [...data.dashboardGroups, group]
+    this.save(data)
+  },
+
+  updateDashboardGroup(group: DashboardGroup): void {
+    const data = this.load()
+    data.dashboardGroups = data.dashboardGroups.map(g =>
+      g.id === group.id ? group : g
+    )
+    this.save(data)
+  },
+
+  deleteDashboardGroup(groupId: string): void {
+    const data = this.load()
+    data.dashboardGroups = data.dashboardGroups.filter(g => g.id !== groupId)
+    if (data.activeDashboardGroupId === groupId) {
+      data.activeDashboardGroupId = null
+    }
     this.save(data)
   },
 

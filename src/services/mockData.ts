@@ -1,6 +1,6 @@
 import { storage } from './storage'
 import { generateId, addDays, formatDate } from '@/utils'
-import type { Freezer, Shelf, Box, Sample, BoxMatrix } from '@/types'
+import type { Freezer, Shelf, Box, Sample, BoxMatrix, DashboardGroup } from '@/types'
 import { SampleStatus } from '@/types'
 
 export const mockData = {
@@ -120,6 +120,25 @@ export const mockData = {
       boxMatrices[box.id] = matrix
     })
 
+    const dashboardGroups: DashboardGroup[] = [
+      {
+        id: 'DG001',
+        name: '肿瘤研究专用',
+        color: '#3B82F6',
+        boxIds: ['B001'],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: 'DG002',
+        name: '血液样本专区',
+        color: '#10B981',
+        boxIds: ['B002'],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ]
+
     storage.saveFreezers(freezers)
     storage.saveShelves(shelves)
     storage.saveBoxes(boxes)
@@ -127,6 +146,8 @@ export const mockData = {
 
     const data = storage.load()
     data.boxMatrices = boxMatrices
+    data.dashboardGroups = dashboardGroups
+    data.activeDashboardGroupId = null
     storage.save(data)
   },
 

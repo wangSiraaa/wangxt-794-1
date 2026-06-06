@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { AppProvider, useApp } from './context/AppContext'
 import { BoxMatrixView } from './components/BoxMatrixView'
 import { SearchPanel } from './components/SearchPanel'
 import { SampleDetail } from './components/SampleDetail'
 import { AdminPanel } from './components/AdminPanel'
 import { PrintQueuePanel } from './components/PrintQueuePanel'
+import { DashboardGroup } from './components/DashboardGroup'
 import { UserRole } from './types'
 import type { Sample } from './types'
 
@@ -13,6 +14,33 @@ type ViewType = 'search' | 'admin' | 'print'
 const MainContent: React.FC = () => {
   const { state, dispatch } = useApp()
   const [activeView, setActiveView] = useState<ViewType>('search')
+
+  const filteredBoxIds = useMemo(() => {
+    if (!state.activeDashboardGroupId) return null
+    const activeGroup = state.dashboardGroups.find(g => g.id === state.activeDashboardGroupId)
+    return activeGroup ? activeGroup.boxIds : null
+  }, [state.activeDashboardGroupId, state.dashboardGroups])
+
+  const filteredFreezers = useMemo(() => {
+    if (!filteredBoxIds) return state.freezers
+    const freezerIds = new Set(
+      state.boxes.filter(b => filteredBoxIds.includes(b.id)).map(b => b.freezerId)
+    )
+    return state.freezers.filter(f => freezerIds.has(f.id))
+  }, [state.freezers, state.boxes, filteredBoxIds])
+
+  const filteredShelves = useMemo(() => {
+    if (!filteredBoxIds) return state.shelves
+    const shelfIds = new Set(
+      state.boxes.filter(b => filteredBoxIds.includes(b.id)).map(b => b.shelfId)
+    )
+    return state.shelves.filter(s => shelfIds.has(s.id))
+  }, [state.shelves, state.boxes, filteredBoxIds])
+
+  const filteredBoxes = useMemo(() => {
+    if (!filteredBoxIds) return state.boxes
+    return state.boxes.filter(b => filteredBoxIds.includes(b.id))
+  }, [state.boxes, filteredBoxIds])
 
   const handleCellClick = (sample: Sample | null, _row: number, _col: number) => {
     dispatch({ type: 'SELECT_SAMPLE', payload: sample })
@@ -106,25 +134,43 @@ const MainContent: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-4 py-6">
         {activeView === 'search' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="lg:col-span-1 space-y-6">
+              <DashboardGroup />
+
+              {state.activeDashboardGroupId && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    当前分组筛选：
+                    <span className="font-medium">
+                      {state.dashboardGroups.find(g => g.id === state.activeDashboardGroupId)?.name}
+                    </span>
+                  </p>
+                  <p className="text-xs text-blue-600 mt-1">
+                    显示 {filteredBoxes.length} 个冻存盒
+                  </p>
+                </div>
+              )}
+            </div>
+
             <div className="lg:col-span-2 space-y-6">
               <SearchPanel />
 
               <div className="bg-white rounded-lg border border-gray-200 p-6">
                 <h3 className="text-lg font-medium text-gray-800 mb-4">盒位矩阵</h3>
 
-                <div className="mb-4 flex gap-3">
+                <div className="mb-4 flex gap-3 flex-wrap">
                   <div>
                     <label className="block text-sm text-gray-600 mb-1">冰箱</label>
                     <select
                       value={
                         state.selectedBoxId
-                          ? state.boxes.find(b => b.id === state.selectedBoxId)?.freezerId || ''
+                          ? filteredBoxes.find(b => b.id === state.selectedBoxId)?.freezerId || ''
                           : ''
                       }
                       onChange={e => {
                         const freezerId = e.target.value
-                        const firstBox = state.boxes.find(b => b.freezerId === freezerId)
+                        const firstBox = filteredBoxes.find(b => b.freezerId === freezerId)
                         if (firstBox) {
                           dispatch({ type: 'SELECT_BOX', payload: firstBox.id })
                         } else {
@@ -134,7 +180,7 @@ const MainContent: React.FC = () => {
                       className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">选择冰箱</option>
-                      {state.freezers.map(f => (
+                      {filteredFreezers.map(f => (
                         <option key={f.id} value={f.id}>
                           {f.freezerName}
                         </option>
@@ -148,12 +194,12 @@ const MainContent: React.FC = () => {
                       <select
                         value={
                           state.selectedBoxId
-                            ? state.boxes.find(b => b.id === state.selectedBoxId)?.shelfId || ''
+                            ? filteredBoxes.find(b => b.id === state.selectedBoxId)?.shelfId || ''
                             : ''
                         }
                         onChange={e => {
                           const shelfId = e.target.value
-                          const firstBox = state.boxes.find(b => b.shelfId === shelfId)
+                          const firstBox = filteredBoxes.find(b => b.shelfId === shelfId)
                           if (firstBox) {
                             dispatch({ type: 'SELECT_BOX', payload: firstBox.id })
                           }
@@ -161,11 +207,11 @@ const MainContent: React.FC = () => {
                         className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">选择层架</option>
-                        {state.shelves
+                        {filteredShelves
                           .filter(
                             s =>
                               s.freezerId ===
-                              state.boxes.find(b => b.id === state.selectedBoxId)?.freezerId
+                              filteredBoxes.find(b => b.id === state.selectedBoxId)?.freezerId
                           )
                           .map(s => (
                             <option key={s.id} value={s.id}>
@@ -184,7 +230,7 @@ const MainContent: React.FC = () => {
                       className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">选择冻存盒</option>
-                      {state.boxes.map(b => (
+                      {filteredBoxes.map(b => (
                         <option key={b.id} value={b.id}>
                           {b.boxCode} - {b.boxName}
                         </option>
@@ -194,7 +240,13 @@ const MainContent: React.FC = () => {
                 </div>
 
                 {state.selectedBoxId ? (
-                  <BoxMatrixView boxId={state.selectedBoxId} onCellClick={handleCellClick} />
+                  filteredBoxIds && !filteredBoxIds.includes(state.selectedBoxId) ? (
+                    <div className="text-center py-16 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-gray-500">当前分组不包含此冻存盒，请切换分组或选择其他冻存盒</p>
+                    </div>
+                  ) : (
+                    <BoxMatrixView boxId={state.selectedBoxId} onCellClick={handleCellClick} />
+                  )
                 ) : (
                   <div className="text-center py-16 bg-gray-50 rounded-lg border border-gray-200">
                     <p className="text-gray-500">请选择一个冻存盒查看盒位矩阵</p>
