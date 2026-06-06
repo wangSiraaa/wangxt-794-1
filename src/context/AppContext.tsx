@@ -58,6 +58,7 @@ type AppAction =
   | { type: 'ADD_RECENT_QUERY'; payload: RecentQuery }
   | { type: 'ADD_MOVE_RECORD'; payload: MoveRecord }
   | { type: 'REFRESH_DATA' }
+  | { type: 'MOVE_SAMPLE'; payload: { sampleId: string; toBoxId: string; toPosition: { row: number; col: number }; operator?: string } }
 
 const initialState: AppState = {
   freezers: [],
